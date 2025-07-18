@@ -169,7 +169,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Phone Number Library**: [libphonenumber-js](https://github.com/catamphetamine/libphonenumber-js)
 - **CSS Framework**: [Tailwind CSS](https://tailwindcss.com/)
 - **Icons**: Custom design with WhatsApp branding
-- **Animations**: Tenor GIFs
+- **Animations**: [Tenor GIFs](https://tenor.com) and [r/PartyParrot](https://www.reddit.com/r/PartyParrot/comments/17okpdk/party_tiels/)
 
 ## 📞 Support
 
