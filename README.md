@@ -105,7 +105,6 @@ Language detection is automatic based on browser settings.
 - **Liquid Glass Effect**: Beautiful glassmorphism with backdrop blur
 - **Responsive Design**: Adapts to all screen sizes
 - **Smooth Animations**: CSS animations and transitions
-- **Dark/Light Mode**: Automatic theme detection
 - **iOS-style Scrollbars**: Custom scrollbar styling
 
 ## 📞 Phone Number Features
@@ -125,7 +124,6 @@ Language detection is automatic based on browser settings.
 
 ### PWA Configuration
 - App Name: "Phone to WhatsApp"
-- Short Name: "WA Launcher"
 - Theme Color: WhatsApp Green (#128C7E)
 - Display Mode: Standalone
 
