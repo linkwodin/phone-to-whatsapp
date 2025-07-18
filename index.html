@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Phone to WhatsApp</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#128C7E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Phone to WhatsApp">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Phone to WhatsApp">
+  <meta name="msapplication-TileColor" content="#128C7E">
+  <meta name="msapplication-tap-highlight" content="no">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon-precomposed" href="icon-192.png">
+  <script src="countryCodes.js"></script>
+  <script src="translations.js"></script>
+  <script>
+    // Fallback functions for when local files are not available
+    function loadTailwindFromCDN() {
+      console.log('Loading Tailwind from CDN...');
+      const script = document.createElement('script');
+      script.src = 'https://cdn.tailwindcss.com';
+      document.head.appendChild(script);
+    }
+    
+    function loadLibPhoneNumberFromCDN() {
+      console.log('Loading libphonenumber from CDN...');
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.12.10/libphonenumber-js.min.js';
+      document.head.appendChild(script);
+    }
+  </script>
+  <script src="tailwind.min.js" onerror="loadTailwindFromCDN()"></script>
+  <script src="libphonenumber.min.js" onerror="loadLibPhoneNumberFromCDN()"></script>
+  <script>
+    // Register Service Worker for offline functionality
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => {
+            console.log('SW registered: ', registration);
+          })
+          .catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+    
+    // Force full-screen mode on mobile
+    if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+      document.body.style.position = 'fixed';
+      document.body.style.top = '0';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.bottom = '0';
+      document.body.style.overflow = 'hidden';
+    }
+    
+    // Prevent zoom on mobile
+    document.addEventListener('touchstart', function(event) {
+      if (event.touches.length > 1) {
+        event.preventDefault();
+      }
+    }, { passive: false });
+    
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(event) {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+  </script>
+  <style>
+    /* iPhone status bar margin */
+    @supports (padding: max(0px)) {
+      body {
+        padding-top: max(0px, env(safe-area-inset-top));
+        padding-bottom: max(0px, env(safe-area-inset-bottom));
+        padding-left: max(0px, env(safe-area-inset-left));
+        padding-right: max(0px, env(safe-area-inset-right));
+      }
+    }
+    
+    /* Ensure full-screen display */
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      min-height: 100dvh; /* Dynamic viewport height */
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
+    }
+    
+    /* Hide browser UI elements when in standalone mode */
+    @media all and (display-mode: standalone) {
+      body {
+        overflow: hidden;
+      }
+    }
+    
+    /* Force full-screen on mobile */
+    @media screen and (max-width: 768px) {
+      body {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+      }
+    }
+    
+.liquid-glass {
+  position: relative;
+  padding: 1.5rem;
+  border-radius: 100vmax;
+  isolation: isolate;
+  background-color: rgb(255 255 255 / 25%);
+  color: rgb(255 255 255 / 90%);
+  text-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  font-size: 1.25rem;
+  box-shadow: 0 6px 6px rgb(0 0 0 / 20%), 0 0 20px rgb(0 0 0 / 10%);
+  text-align: center;
+  
+  &::before,
+  &::after {
+    pointer-events: none;
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  
+  &::before {
+    pointer-events: none;
+    backdrop-filter: blur(3px);
+    filter: url(#glass-distortion);
+    z-index: -1;
+  }
+  
+  &::after {
+    pointer-events: none;
+    box-shadow: inset 2px 2px 1px 0 rgb(255 255 255 / 50%), inset -1px -1px 1px 1px rgb(255 255 255 / 50%);
+  }
+
+}
+
+    .input-glow {
+      transition: all 0.3s ease;
+    }
+    .input-glow:focus {
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+    }
+    .button-glow {
+      transition: all 0.3s ease;
+    }
+    .button-glow:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+    }
+    .button-glow:disabled,
+    .button-glow[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+      box-shadow: none;
+    }
+    .select-glow {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: #222;
+    }
+    .select-glow option {
+      background-color: #f3f4f6;
+      color: #222;
+    }
+    .progress-bar {
+      height: 8px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background-color: #facc15;
+      width: 100%;
+      animation: countdown 10s linear forwards;
+    }
+    @keyframes countdown {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+    .cockatiel {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .toggle-switch {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toggle-label {
+      color: #222;
+      font-size: 14px;
+      font-weight: medium;
+    }
+    #warningMessage {
+      min-height: 40px; /* Reserve space for error message */
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #b45309; /* dark yellow/orange */
+      background: rgba(255, 243, 191, 0.85); /* soft yellow background */
+      border: 1px solid #facc15;
+      border-radius: 0.5rem;
+    }
+    #warningMessage.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .liquid-glass.error-animate {
+      box-shadow: 0 0 0 4px #fde047, 0 6px 6px rgb(0 0 0 / 20%), 0 0 20px rgb(0 0 0 / 10%);
+      background-color: rgb(255 255 200 / 35%);
+      animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) 2;
+    }
+    @keyframes shake {
+      10%, 90% { transform: translateX(-2px); }
+      20%, 80% { transform: translateX(4px); }
+      30%, 50%, 70% { transform: translateX(-8px); }
+      40%, 60% { transform: translateX(8px); }
+      100% { transform: translateX(0); }
+    }
+    .liquid-glass.error-red {
+      box-shadow: 0 0 0 4px #f87171, 0 6px 6px rgb(0 0 0 / 20%), 0 0 20px rgb(0 0 0 / 10%);
+      background-color: rgb(255 220 220 / 35%);
+    }
+    #warningMessage.error-red {
+      background: rgba(254, 202, 202, 0.95); /* soft red */
+      border: 1px solid #ef4444;
+      color: #ef4444 !important;
+    }
+
+    /* iOS-style scrollbar */
+    .ios-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .ios-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .ios-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+      transition: background 0.2s ease;
+    }
+
+    .ios-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    /* Firefox scrollbar */
+    .ios-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    }
+    
+    /* Safe area for top elements */
+    .top-elements {
+      padding-top: max(0px, env(safe-area-inset-top));
+      padding-left: max(0px, env(safe-area-inset-left));
+      padding-right: max(0px, env(safe-area-inset-right));
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-yellow-100 via-yellow-50 to-sky-100 flex items-center justify-center h-screen relative overflow-hidden">
+    <!-- SVG filter for glass effect -->
+  <svg xmlns="http://www.w3.org/2000/svg" role="presentation" style="display: none">
+    <filter id="glass-distortion" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+      <feTurbulence type="fractalNoise" baseFrequency="0.001 0.005" numOctaves="1" seed="17" result="turbulence"/>
+      <feComponentTransfer in="turbulence" result="mapped">
+        <feFuncR type="gamma" amplitude="1" exponent="10" offset="0.5" />
+        <feFuncG type="gamma" amplitude="0" exponent="1" offset="0" />
+        <feFuncB type="gamma" amplitude="0" exponent="1" offset="0.5" />
+      </feComponentTransfer>
+      <feGaussianBlur in="turbulence" stdDeviation="3" result="softMap" />
+      <feSpecularLighting in="softMap" surfaceScale="5" specularConstant="1" specularExponent="100" lighting-color="white" result="specLight">
+        <fePointLight x="-200" y="-200" z="300" />
+      </feSpecularLighting>
+      <feComposite in="specLight" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="litImage" />
+      <feDisplacementMap in="SourceGraphic" in2="softMap" scale="200" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+
+  <div id="cockatiel" class="cockatiel hidden">
+    <img src="flying.gif" id="flying-cockatiel" alt="Flying Cockatiel" width="64" height="64" />
+  </div>
+  <div class="toggle-switch top-elements">
+    <label class="relative inline-flex items-center cursor-pointer">
+      <input type="checkbox" id="animationToggle" class="sr-only peer">
+      <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:bg-blue-600 transition"></div>
+      <div class="absolute w-4 h-4 bg-white rounded-full top-1 left-1 peer-checked:translate-x-5 transition"></div>
+    </label>
+    <img id="birdGif" src="ebu1tiu98lyb1.gif" alt="Bird Animation" class="w-10 h-10 object-contain" style="margin-left: 8px;" />
+  </div>
+  <div class="language-switcher absolute top-4 left-4 z-30 top-elements" style="display: flex;">
+    <select id="languageSelect" class="text-sm bg-white/10 text-black border border-black/20 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <option value="en">English</option>
+      <option value="zh">繁體中文</option>
+      <option value="ja">日本語</option>
+    </select>
+    <button id="infoButton" class="w-8 h-8 ml-2 bg-white/10 text-black border border-black/20 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+      </svg>
+    </button>
+  </div>
+  <div class="liquid-glass p-8 rounded-2xl shadow-2xl w-full max-w-xs relative z-20">
+    <h1 class="text-3xl font-bold mb-6 text-black text-center tracking-tight">Phone to WhatsApp</h1>
+    <div class="mb-6">
+      <label for="countryCode" class="block text-sm font-medium text-black mb-2">Country Code</label>
+      <select id="countryCode" class="w-full p-3 border border-black/20 rounded-xl input-glow select-glow focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <!-- Options will be populated by JavaScript -->
+      </select>
+    </div>
+    <div class="mb-6">
+      <label for="phoneNumber" class="block text-sm font-medium text-black mb-2">Phone Number</label>
+      <input type="tel" id="phoneNumber" class="w-full p-3 bg-white/10 text-black border border-black/20 rounded-xl input-glow focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-black/50" placeholder="Enter phone number">
+    </div>
+    <div id="warningMessage" class="hidden mb-6 text-sm text-center font-medium">
+      <span id="warningText"></span>
+      <div class="progress-bar mt-2">
+        <div id="progressFill" class="progress-fill">      </div>
+      </div>
+    </div>
+    <button id="launchWhatsApp" class="w-full bg-cyan-500 text-white p-3 rounded-xl button-glow font-semibold">Launch WhatsApp</button>
+  </div><!-- Information Modal -->
+        <div id="infoModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+      <div class="liquid-glass rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] relative">
+        <div class="p-8 overflow-y-auto max-h-[calc(90vh-2rem)] ios-scrollbar">
+      <button id="closeInfoButton" class="absolute top-4 right-4 text-black hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+      
+      <div class="text-black">
+        <h2 class="text-2xl font-bold mb-6 text-center" id="infoTitle">Install Web App</h2>
+        
+        <div class="space-y-6">
+          <!-- Installation Instructions -->
+          <div>
+            <h3 class="text-lg font-semibold mb-3" id="installTitle">How to Install:</h3>
+            <div class="space-y-3 text-sm">
+              <div class="flex items-start space-x-3">
+                <span class="bg-blue-100 text-blue-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
+                <p id="installStep1" class="text-left leading-relaxed">Open this page in your mobile browser (Chrome, Safari, etc.)</p>
+              </div>
+              <div class="flex items-start space-x-3">
+                <span class="bg-blue-100 text-blue-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
+                <p id="installStep2" class="text-left leading-relaxed">Tap the "Add to Home Screen" option in your browser menu</p>
+              </div>
+              <div class="flex items-start space-x-3">
+                <span class="bg-blue-100 text-blue-800 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
+                <p id="installStep3" class="text-left leading-relaxed">Confirm the installation and enjoy offline access!</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Benefits -->
+          <div>
+            <h3 class="text-lg font-semibold mb-3" id="benefitsTitle">Benefits:</h3>
+            <ul class="space-y-2 text-sm">
+              <li class="flex items-start space-x-2">
+                <span class="text-green-500 mt-1 flex-shrink-0">✓</span>
+                <span id="benefit1" class="text-left leading-relaxed">Works offline - no internet required after installation</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <span class="text-green-500 mt-1 flex-shrink-0">✓</span>
+                <span id="benefit2" class="text-left leading-relaxed">Quick access from your home screen</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <span class="text-green-500 mt-1 flex-shrink-0">✓</span>
+                <span id="benefit3" class="text-left leading-relaxed">Full app-like experience</span>
+              </li>
+            </ul>
+          </div>
+          
+          <!-- Credits -->
+          <div class="border-t pt-4">
+            <h3 class="text-lg font-semibold mb-3" id="creditsTitle">Credits:</h3>
+            <div class="text-sm space-y-2">
+              <p><span><Source></Source>:</span> <a href="https://github.com/linkwodin/phone-to-whatsapp.git" target="_blank" class="text-blue-600 hover:underline">GitHub</a></p>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="countryCodes.js"></script>
+  <script>
+
+    const countryCodeSelect = document.getElementById('countryCode');
+    const phoneNumberInput = document.getElementById('phoneNumber');
+    const launchButton = document.getElementById('launchWhatsApp');
+    const warningMessage = document.getElementById('warningMessage');
+    const warningText = document.getElementById('warningText');
+    const progressFill = document.getElementById('progressFill');
+    const cockatiel = document.getElementById('cockatiel');
+    const animationToggle = document.getElementById('animationToggle');
+    const birdGif = document.getElementById('birdGif');
+    let confirmTimeout = null;
+    let isConfirmMode = false;
+    // Track animation frame and interval globally
+    let cockatielAnimationFrameId = null;
+    let cockatielPositionLogInterval = null;
+
+    // Detect user's country based on browser language
+    const userLocale = navigator.language || 'en-US';
+    const userCountryCode = userLocale === 'zh-HK' ? '+852' : '+1'; // Default to +1 if unknown
+
+    // Populate country code dropdown, duplicating user's country at the top
+    function populateCountryCodes() {
+      let options = [];
+      // Use saved code if available
+      const savedCode = localStorage.getItem('selectedCountryCode');
+      const userCode = window.countryCodes.find(c => c.code === (savedCode || userCountryCode)) || window.countryCodes[0];
+      options.push(`<option value="${userCode.code}" selected>${userCode.name}</option>`);
+      window.countryCodes.forEach(country => {
+        if (country.code !== userCode.code) {
+          options.push(`<option value="${country.code}">${country.name}</option>`);
+        }
+      });
+      options.push(`<option value="${userCode.code}">${userCode.name}</option>`);
+      countryCodeSelect.innerHTML = options.join('');
+      countryCodeSelect.value = userCode.code;
+    }
+
+    // Full mapping from country calling code to ISO country code
+    const countryCodeToISO = {
+      "+1": "US",
+      "+7": "RU",
+      "+20": "EG",
+      "+27": "ZA",
+      "+30": "GR",
+      "+31": "NL",
+      "+32": "BE",
+      "+33": "FR",
+      "+34": "ES",
+      "+36": "HU",
+      "+39": "IT",
+      "+40": "RO",
+      "+41": "CH",
+      "+43": "AT",
+      "+44": "GB",
+      "+45": "DK",
+      "+46": "SE",
+      "+47": "NO",
+      "+48": "PL",
+      "+49": "DE",
+      "+51": "PE",
+      "+52": "MX",
+      "+53": "CU",
+      "+54": "AR",
+      "+55": "BR",
+      "+56": "CL",
+      "+57": "CO",
+      "+58": "VE",
+      "+60": "MY",
+      "+61": "AU",
+      "+62": "ID",
+      "+63": "PH",
+      "+64": "NZ",
+      "+65": "SG",
+      "+66": "TH",
+      "+81": "JP",
+      "+82": "KR",
+      "+84": "VN",
+      "+86": "CN",
+      "+90": "TR",
+      "+91": "IN",
+      "+92": "PK",
+      "+93": "AF",
+      "+94": "LK",
+      "+95": "MM",
+      "+98": "IR",
+      "+211": "SS",
+      "+212": "MA",
+      "+213": "DZ",
+      "+216": "TN",
+      "+218": "LY",
+      "+220": "GM",
+      "+221": "SN",
+      "+222": "MR",
+      "+223": "ML",
+      "+224": "GN",
+      "+225": "CI",
+      "+226": "BF",
+      "+227": "NE",
+      "+228": "TG",
+      "+229": "BJ",
+      "+230": "MU",
+      "+231": "LR",
+      "+232": "SL",
+      "+233": "GH",
+      "+234": "NG",
+      "+235": "TD",
+      "+236": "CF",
+      "+237": "CM",
+      "+238": "CV",
+      "+239": "ST",
+      "+240": "GQ",
+      "+241": "GA",
+      "+242": "CG",
+      "+243": "CD",
+      "+244": "AO",
+      "+245": "GW",
+      "+246": "IO",
+      "+248": "SC",
+      "+249": "SD",
+      "+250": "RW",
+      "+251": "ET",
+      "+252": "SO",
+      "+253": "DJ",
+      "+254": "KE",
+      "+255": "TZ",
+      "+256": "UG",
+      "+257": "BI",
+      "+258": "MZ",
+      "+260": "ZM",
+      "+261": "MG",
+      "+262": "RE",
+      "+263": "ZW",
+      "+264": "NA",
+      "+265": "MW",
+      "+266": "LS",
+      "+267": "BW",
+      "+268": "SZ",
+      "+269": "KM",
+      "+290": "SH",
+      "+291": "ER",
+      "+297": "AW",
+      "+298": "FO",
+      "+299": "GL",
+      "+350": "GI",
+      "+351": "PT",
+      "+352": "LU",
+      "+353": "IE",
+      "+354": "IS",
+      "+355": "AL",
+      "+356": "MT",
+      "+357": "CY",
+      "+358": "FI",
+      "+359": "BG",
+      "+370": "LT",
+      "+371": "LV",
+      "+372": "EE",
+      "+373": "MD",
+      "+374": "AM",
+      "+375": "BY",
+      "+376": "AD",
+      "+377": "MC",
+      "+378": "SM",
+      "+380": "UA",
+      "+381": "RS",
+      "+382": "ME",
+      "+383": "XK",
+      "+385": "HR",
+      "+386": "SI",
+      "+387": "BA",
+      "+389": "MK",
+      "+420": "CZ",
+      "+421": "SK",
+      "+423": "LI",
+      "+500": "FK",
+      "+501": "BZ",
+      "+502": "GT",
+      "+503": "SV",
+      "+504": "HN",
+      "+505": "NI",
+      "+506": "CR",
+      "+507": "PA",
+      "+508": "PM",
+      "+509": "HT",
+      "+590": "GP",
+      "+591": "BO",
+      "+592": "GY",
+      "+593": "EC",
+      "+594": "GF",
+      "+595": "PY",
+      "+596": "MQ",
+      "+597": "SR",
+      "+598": "UY",
+      "+599": "BQ",
+      "+670": "TL",
+      "+672": "NF",
+      "+673": "BN",
+      "+674": "NR",
+      "+675": "PG",
+      "+676": "TO",
+      "+677": "SB",
+      "+678": "VU",
+      "+679": "FJ",
+      "+680": "PW",
+      "+681": "WF",
+      "+682": "CK",
+      "+683": "NU",
+      "+685": "WS",
+      "+686": "KI",
+      "+687": "NC",
+      "+688": "TV",
+      "+689": "PF",
+      "+690": "TK",
+      "+691": "FM",
+      "+692": "MH",
+      "+850": "KP",
+      "+852": "HK",
+      "+853": "MO",
+      "+855": "KH",
+      "+856": "LA",
+      "+880": "BD",
+      "+886": "TW",
+      "+960": "MV",
+      "+961": "LB",
+      "+962": "JO",
+      "+963": "SY",
+      "+964": "IQ",
+      "+965": "KW",
+      "+966": "SA",
+      "+967": "YE",
+      "+968": "OM",
+      "+970": "PS",
+      "+971": "AE",
+      "+972": "IL",
+      "+973": "BH",
+      "+974": "QA",
+      "+975": "BT",
+      "+976": "MN",
+      "+977": "NP",
+      "+992": "TJ",
+      "+993": "TM",
+      "+994": "AZ",
+      "+995": "GE",
+      "+996": "KG",
+      "+998": "UZ"
+    };
+
+    // Format phone number using libphonenumber-js
+    function formatPhoneNumber(number, countryCode) {
+      try {
+        // Handle empty or whitespace-only input
+        if (!number || number.trim() === '') {
+          return '';
+        }
+        
+        // Use the full number (with country code if present)
+        const iso = countryCodeToISO[countryCode];
+        if (!iso) return number;
+        // If number starts with +, use as is; else, prepend country code
+        const fullNumber = number.startsWith('+') ? number : countryCode + number.replace(/\D/g, '');
+        const phoneNumber = libphonenumber.parsePhoneNumberFromString(fullNumber, iso);
+        
+        return phoneNumber ? phoneNumber.formatNational() : number;
+      } catch (e) {
+        return number;
+      }
+    }
+
+    // Validate phone number using libphonenumber-js
+    function isValidPhoneNumber(number, countryCode) {
+      try {
+        const iso = countryCodeToISO[countryCode];
+        if (!iso) return false;
+        // Only use digits for validation
+        const digits = number.replace(/\D/g, '').trim();
+        const phoneNumber = libphonenumber.parsePhoneNumberFromString(digits, iso);
+        return phoneNumber ? phoneNumber.isValid() : false;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Restrict + sign to first character
+    function restrictPlusSign(input) {
+      let value = input.value;
+      if (value.indexOf('+') !== -1 && value.indexOf('+') !== 0) {
+        value = value.replace(/\+/g, ''); // Remove + if not at start
+        input.value = value;
+      }
+      return value;
+    }
+
+    // Parse and process phone number input
+    function processPhoneNumber(input, updateCountryCode = false) {
+      let number = input.replace(' ', '').trim();
+      let selectedCode = countryCodeSelect.value;
+
+      // Only update country code if input starts with +
+      if (updateCountryCode && number.startsWith('+')) {
+        let matchedCode = null;
+        countryCodes.forEach(country => {
+          if (number.startsWith(country.code) || number === country.code) {
+            matchedCode = country.code;
+            number = number.replace(country.code, '').trim();
+          }
+        });
+        if (matchedCode) {
+          countryCodeSelect.value = matchedCode;
+          selectedCode = matchedCode;
+        }
+      }
+
+      // Clean and format the number
+      const digits = number.replace(/\D/g, '');
+      phoneNumberInput.value = formatPhoneNumber(digits, selectedCode);
+      return { code: selectedCode, number: digits };
+    }
+
+    // Helper to check if phone number is empty
+    function isPhoneNumberEmpty() {
+      return phoneNumberInput.value.replace(/\D/g, '').length === 0;
+    }
+
+    // Reset to Launch mode
+    function resetToLaunchMode() {
+      isConfirmMode = false;
+      launchButton.textContent = getTranslation('launchWhatsApp');
+      launchButton.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+      launchButton.classList.add('bg-cyan-500', 'hover:bg-cyan-600');
+      warningMessage.classList.remove('visible', 'error-red');
+      warningText.textContent = '';
+      progressFill.style.animation = 'none';
+      progressFill.parentElement.style.display = 'none'; // Hide progress bar
+      if (confirmTimeout) {
+        clearTimeout(confirmTimeout);
+        confirmTimeout = null;
+      }
+    }
+
+    // Start countdown progress bar
+    function startCountdown() {
+      progressFill.style.animation = 'none'; // Remove animation
+      void progressFill.offsetWidth; // Force reflow
+      progressFill.style.animation = 'countdown 10s linear forwards'; // Reapply animation
+      confirmTimeout = setTimeout(resetToLaunchMode, 10000); // Revert after 10 seconds
+    }
+
+    // Cockatiel animation
+    function startCockatielAnimation() {
+      if (!animationToggle.checked) return;
+      // Cancel any existing animation and interval
+      if (cockatielAnimationFrameId !== null) {
+        cancelAnimationFrame(cockatielAnimationFrameId);
+        cockatielAnimationFrameId = null;
+      }
+      if (cockatielPositionLogInterval !== null) {
+        clearInterval(cockatielPositionLogInterval);
+        cockatielPositionLogInterval = null;
+      }
+      cockatiel.classList.remove('hidden');
+      // Flip SVG to face direction of flight
+      const cockatielSVG = document.getElementById('flying-cockatiel');
+      const direction = Math.random() < 0.5 ? 'left-to-right' : 'right-to-left';
+      if (cockatielSVG) {
+        if (direction === 'right-to-left') {
+          cockatielSVG.style.transform = 'scaleX(1)';
+        } else {
+          cockatielSVG.style.transform = 'scaleX(-1)';
+        }
+      }
+      const startY = (Math.random() < 0.5 ? 1 : -1) * (window.innerHeight * 0.2); // 30%-70% height
+      const startX = direction === 'left-to-right' ? -1 * window.innerWidth/2 - 100 : 1 * window.innerWidth/2 + 100; // -5% or 105% vw
+      const endX = direction === 'left-to-right' ? 1 * window.innerWidth/2 + 100 : -1 * window.innerWidth/2 - 100;
+      const duration = 5000; // 5 seconds
+      let startTime = null;
+      // --- Smoother motion: fix arc/flap per flight ---
+      // Use fixed arc/flap params for this flight
+      const arcHeight = 130; // main arc height
+      const flapAmplitude = 14; // flap amplitude
+      const flapFrequency = 5.5; // flaps per flight
+      let lastAngle = 0;
+      function animate(time) {
+        if (!startTime) startTime = time;
+        const progress = (time - startTime) / duration;
+        if (progress >= 1) {
+          cockatiel.classList.add('hidden');
+          if (cockatielPositionLogInterval !== null) {
+            clearInterval(cockatielPositionLogInterval);
+            cockatielPositionLogInterval = null;
+          }
+          const delay = Math.floor(Math.random() * (20000 - 10000 + 1)) + 10000; // 10-20s
+          setTimeout(startCockatielAnimation, delay);
+          cockatielAnimationFrameId = null;
+          return;
+        }
+        const x = startX + (endX - startX) * progress;
+        // --- Smoother arc: easeInOutSine ---
+        function easeInOutSine(t) {
+          return -(Math.cos(Math.PI * t) - 1) / 2;
+        }
+        const arcY = -arcHeight * easeInOutSine(progress);
+        // --- Smoother flap: sine ---
+        const flapY = Math.sin(progress * Math.PI * flapFrequency) * flapAmplitude;
+        const y = startY + arcY + flapY;
+        // --- Smoother rotation: interpolate angle ---
+        const nextProgress = Math.min(progress + 0.01, 1);
+        const arcY2 = -arcHeight * easeInOutSine(nextProgress);
+        const flapY2 = Math.sin(nextProgress * Math.PI * flapFrequency) * flapAmplitude;
+        const y2 = startY + arcY2 + flapY2;
+        const dy = y2 - y;
+        let angle = Math.max(Math.min(dy * 1.1, 22), -22); // Clamp between -22 and 22 degrees
+        // Smoothly interpolate angle
+        angle = lastAngle * 0.7 + angle * 0.3;
+        lastAngle = angle;
+        cockatiel.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
+        cockatielAnimationFrameId = requestAnimationFrame(animate);
+      }
+
+      // Log position every second
+      cockatielPositionLogInterval = setInterval(() => {
+        const x = startX + (endX - startX) * Math.min((performance.now() - startTime) / duration, 1);
+        const y = startY + Math.sin(Math.min((performance.now() - startTime) / duration, 1) * Math.PI * 4) * 50;
+      }, 1000);
+      cockatielAnimationFrameId = requestAnimationFrame(animate);
+    }
+
+    // Load animation setting from localStorage
+    function loadAnimationSetting() {
+      const animationEnabled = localStorage.getItem('animationEnabled') !== 'false';
+      animationToggle.checked = animationEnabled;
+      updateBirdGif();
+      if (animationEnabled) {
+        startCockatielAnimation();
+      }
+    }
+
+    // Save animation setting to localStorage
+    function saveAnimationSetting() {
+      localStorage.setItem('animationEnabled', animationToggle.checked);
+      if (animationToggle.checked) {
+        startCockatielAnimation();
+      } else {
+        cockatiel.classList.add('hidden');
+        // Cancel any running animation and interval
+        if (cockatielAnimationFrameId !== null) {
+          cancelAnimationFrame(cockatielAnimationFrameId);
+          cockatielAnimationFrameId = null;
+        }
+        if (cockatielPositionLogInterval !== null) {
+          clearInterval(cockatielPositionLogInterval);
+          cockatielPositionLogInterval = null;
+        }
+      }
+    }
+
+    // Improved clipboard check to handle +<countrycode><number> (e.g. +85266286614)
+    async function checkClipboard() {
+      try {
+        if (navigator.clipboard && navigator.permissions) {
+          const permission = await navigator.permissions.query({ name: 'clipboard-read' });
+          if (permission.state === 'granted' || permission.state === 'prompt') {
+            const text = await navigator.clipboard.readText();
+            
+            // More strict phone number validation
+            const hasCountryCode = text.startsWith('+');
+            const cleanedText = text.replace(/\D/g, '');
+            
+            // Check if it's a valid phone number pattern
+            let isValidPhoneNumber = false;
+            
+            if (hasCountryCode) {
+              // If it starts with +, check if it matches a country code + number pattern
+              for (const country of window.countryCodes) {
+                if (text.startsWith(country.code)) {
+                  const rest = text.slice(country.code.length);
+                  const restDigits = rest.replace(/\D/g, '');
+                  if (restDigits.length >= 7 && restDigits.length <= 15) {
+                    isValidPhoneNumber = true;
+                    break;
+                  }
+                }
+              }
+            } else {
+              // If no country code, check if it's just digits in valid range
+              if (cleanedText.length >= 7 && cleanedText.length <= 15 && /^\d+$/.test(text.trim())) {
+                isValidPhoneNumber = true;
+              }
+            }
+            
+            if (isValidPhoneNumber) {
+              // Try to match any country code prefix
+              let matchedCode = null;
+              let rest = text;
+              for (const country of window.countryCodes) {
+                if (text.startsWith(country.code)) {
+                  matchedCode = country.code;
+                  rest = text.slice(country.code.length);
+                  break;
+                }
+              }
+              if (matchedCode) {
+                countryCodeSelect.value = matchedCode;
+                localStorage.setItem('selectedCountryCode', matchedCode);
+                // Use the full pasted value for formatting
+                phoneNumberInput.value = formatPhoneNumber(text, matchedCode);
+              } else if (/^\+?\d{7,15}$/.test(cleanedText)) {
+                phoneNumberInput.value = formatPhoneNumber(text, countryCodeSelect.value);
+              }
+            } else {
+              console.log('Clipboard content does not match phone number pattern:', text);
+            }
+          }
+        }
+      } catch (err) {
+        console.log('Clipboard access denied:', err);
+      }
+    }
+
+    // Trigger glass error animation
+    function triggerGlassErrorAnimation(color) {
+      const glass = document.querySelector('.liquid-glass');
+      if (color === 'red') {
+        glass.classList.add('error-red');
+      } else {
+        glass.classList.remove('error-red');
+      }
+      glass.classList.add('error-animate');
+      setTimeout(() => {
+        glass.classList.remove('error-animate');
+        if (color === 'red') {
+          glass.classList.remove('error-red');
+        }
+      }, 1000); // Duration should match animation (0.5s * 2 = 1s)
+    }
+
+    // Launch WhatsApp or show warning
+    function launchWhatsApp() {
+      const { code, number } = processPhoneNumber(phoneNumberInput.value);
+      if (number.length === 0) {
+        warningText.textContent = getTranslation('pleaseEnterPhone');
+        warningMessage.classList.add('visible', 'error-red');
+        triggerGlassErrorAnimation('red');
+        progressFill.parentElement.style.display = 'none'; // Hide progress bar
+        return;
+      } else {
+        warningMessage.classList.remove('error-red');
+      }
+
+      if (!isValidPhoneNumber(number, code)) {
+        if (!isConfirmMode) {
+          // Enter Confirm mode
+          isConfirmMode = true;
+          const country = window.countryCodes.find(c => c.code === code);
+          warningText.textContent = getTranslation('invalidFormat', {
+            length: country.expectedLength,
+            country: country.name
+          });
+          warningMessage.classList.add('visible');
+          warningMessage.classList.remove('error-red');
+          launchButton.textContent = getTranslation('confirm');
+          launchButton.classList.remove('bg-cyan-500', 'hover:bg-cyan-600');
+          launchButton.classList.add('bg-orange-500', 'hover:bg-orange-600');
+          progressFill.parentElement.style.display = 'block'; // Show progress bar
+          startCountdown(); // Start progress bar
+          triggerGlassErrorAnimation();
+        } else {
+          // In Confirm mode, proceed to WhatsApp
+          resetToLaunchMode();
+          const fullNumber = `${code}${number}`.replace('+', '');
+          localStorage.setItem('selectedCountryCode', countryCodeSelect.value);
+          window.location.href = `https://wa.me/${fullNumber}`;
+        }
+      } else {
+        // Valid number, launch immediately
+        resetToLaunchMode();
+        const fullNumber = `${code}${number}`.replace('+', '');
+        localStorage.setItem('selectedCountryCode', countryCodeSelect.value);
+        window.location.href = `https://wa.me/${fullNumber}`;
+      }
+    }
+
+    // Event listeners
+    countryCodeSelect.addEventListener('change', () => {
+      // Reformat phone number when country code changes
+      processPhoneNumber(phoneNumberInput.value, false);
+    });
+    // On input, allow + and spaces, and detect country codes
+    phoneNumberInput.addEventListener('input', () => {
+      // Do not strip + or spaces
+      if (isConfirmMode) {
+        resetToLaunchMode(); // Revert to Launch mode if number is edited
+      }
+      // Clear error message and classes
+      warningMessage.classList.remove('visible', 'error-red');
+      warningText.textContent = '';
+      
+      const inputValue = phoneNumberInput.value;
+      
+      // Check if input starts with + and try to match country code
+      if (inputValue.startsWith('+')) {
+        let matchedCode = null;
+        let rest = inputValue;
+        
+        // Try to match country code
+        for (const country of window.countryCodes) {
+          if (inputValue.startsWith(country.code)) {
+            matchedCode = country.code;
+            rest = inputValue.slice(country.code.length);
+            console.log('Matched country code:', matchedCode, 'Rest:', rest);
+            break;
+          }
+        }
+        
+        if (matchedCode) {
+          // Update country code dropdown
+          countryCodeSelect.value = matchedCode;
+          localStorage.setItem('selectedCountryCode', matchedCode);
+          // Format the rest of the number
+          const formatted = formatPhoneNumber(rest, matchedCode);
+          console.log('Formatted result:', formatted);
+          phoneNumberInput.value = formatted;
+          return;
+        }
+      }
+      
+      // If no country code match or doesn't start with +, format normally
+      phoneNumberInput.value = formatPhoneNumber(inputValue, countryCodeSelect.value);
+    });
+    phoneNumberInput.addEventListener('blur', () => {
+      // Always format on blur
+      phoneNumberInput.value = formatPhoneNumber(phoneNumberInput.value, countryCodeSelect.value);
+    });
+    phoneNumberInput.addEventListener('paste', (e) => {
+      const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+      
+      // More strict phone number validation
+      const hasCountryCode = pastedData.startsWith('+');
+      const cleanedData = pastedData.replace(/\D/g, ''); // Remove non-digits
+      
+      // Check if it's a valid phone number pattern
+      let isValidPhoneNumber = false;
+      
+      if (hasCountryCode) {
+        // If it starts with +, check if it matches a country code + number pattern
+        for (const country of window.countryCodes) {
+          if (pastedData.startsWith(country.code)) {
+            const rest = pastedData.slice(country.code.length);
+            const restDigits = rest.replace(/\D/g, '');
+            if (restDigits.length >= 7 && restDigits.length <= 15) {
+              isValidPhoneNumber = true;
+              break;
+            }
+          }
+        }
+      } else {
+        // If no country code, check if it's just digits in valid range
+        if (cleanedData.length >= 7 && cleanedData.length <= 15 && /^\d+$/.test(pastedData.trim())) {
+          isValidPhoneNumber = true;
+        }
+      }
+      
+      if (isValidPhoneNumber) {
+        e.preventDefault();
+        phoneNumberInput.value = pastedData;
+        setTimeout(() => processPhoneNumber(pastedData, pastedData.startsWith('+')), 0);
+      } else {
+        // Don't prevent default - let the browser handle it normally
+        console.log('Pasted content does not match phone number pattern:', pastedData);
+      }
+    });
+    launchButton.addEventListener('click', launchWhatsApp);
+    function updateBirdGif() {
+      if (animationToggle.checked) {
+        birdGif.src = 'ebu1tiu98lyb1.gif';
+      } else {
+        birdGif.src = 'frame_00_delay-0.05s.gif';
+      }
+    }
+    animationToggle.addEventListener('change', () => {
+      saveAnimationSetting();
+      updateBirdGif();
+    });
+
+    // Language support
+    function detectLanguage() {
+      const userLang = navigator.language || navigator.userLanguage;
+      const shortLang = userLang.split('-')[0];
+      // Map browser language to our supported languages
+      const langMap = {
+        'zh': 'zh', // Chinese -> Traditional Chinese
+        'ja': 'ja', // Japanese
+        'en': 'en'  // English
+      };
+      return langMap[shortLang] || 'en';
+    }
+
+    function setLanguage(lang) {
+      const t = window.translations[lang] || window.translations.en;
+      
+      // Update all text elements
+      document.querySelector('h1').textContent = t.title;
+      document.querySelector('label[for="countryCode"]').textContent = t.countryCode;
+      document.querySelector('label[for="phoneNumber"]').textContent = t.phoneNumber;
+      document.getElementById('launchWhatsApp').textContent = t.launchWhatsApp;
+      document.getElementById('phoneNumber').placeholder = t.enterPhoneNumber;
+      
+      // Update error messages
+      if (window.currentTranslations) {
+        window.currentTranslations = t;
+      }
+      
+      // Update modal content if modal is open
+      if (!document.getElementById('infoModal').classList.contains('hidden')) {
+        updateInfoModalContent();
+      }
+      
+      // Save language preference
+      localStorage.setItem('selectedLanguage', lang);
+    }
+
+    function getTranslation(key, params = {}) {
+      const t = window.currentTranslations || window.translations.en;
+      let text = t[key] || key;
+      
+      // Replace parameters
+      Object.keys(params).forEach(param => {
+        text = text.replace(`{${param}}`, params[param]);
+      });
+      
+      return text;
+    }
+
+    // Initialize language
+    const currentLang = localStorage.getItem('selectedLanguage') || detectLanguage();
+    setLanguage(currentLang);
+    window.currentTranslations = window.translations[currentLang];
+
+    // Language switcher
+    document.getElementById('languageSelect').value = currentLang;
+    document.getElementById('languageSelect').addEventListener('change', (e) => {
+      setLanguage(e.target.value);
+      window.currentTranslations = window.translations[e.target.value];
+    });
+
+    // Information modal functionality
+    const infoButton = document.getElementById('infoButton');
+    const infoModal = document.getElementById('infoModal');
+    const closeInfoButton = document.getElementById('closeInfoButton');
+
+    function showInfoModal() {
+      infoModal.classList.remove('hidden');
+      infoModal.classList.add('flex');
+      // Update modal content with current language
+      updateInfoModalContent();
+    }
+
+    function hideInfoModal() {
+      infoModal.classList.add('hidden');
+      infoModal.classList.remove('flex');
+    }
+
+    function updateInfoModalContent() {
+      const t = window.currentTranslations || window.translations.en;
+      
+      // Update all modal text elements
+      document.getElementById('infoTitle').textContent = t.infoTitle;
+      document.getElementById('installTitle').textContent = t.installTitle;
+      document.getElementById('installStep1').textContent = t.installStep1;
+      document.getElementById('installStep2').textContent = t.installStep2;
+      document.getElementById('installStep3').textContent = t.installStep3;
+      document.getElementById('benefitsTitle').textContent = t.benefitsTitle;
+      document.getElementById('benefit1').textContent = t.benefit1;
+      document.getElementById('benefit2').textContent = t.benefit2;
+      document.getElementById('benefit3').textContent = t.benefit3;
+      document.getElementById('creditsTitle').textContent = t.creditsTitle;
+      document.getElementById('imageCredits').textContent = t.imageCredits;
+      document.getElementById('techCredits').textContent = t.techCredits;
+      document.getElementById('designCredits').textContent = t.designCredits;
+    }
+
+    infoButton.addEventListener('click', showInfoModal);
+    closeInfoButton.addEventListener('click', hideInfoModal);
+    
+    // Close modal when clicking outside
+    infoModal.addEventListener('click', (e) => {
+      if (e.target === infoModal) {
+        hideInfoModal();
+      }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !infoModal.classList.contains('hidden')) {
+        hideInfoModal();
+      }
+    });
+
+    // Initialize
+    populateCountryCodes();
+    checkClipboard();
+    loadAnimationSetting();
+  </script>
+</body>
+</html>
